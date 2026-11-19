@@ -1,0 +1,19 @@
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+indent_style = space
+indent_size = 4
+
+[*.{ts,tsx,js,mjs,json,yml,yaml}]
+indent_size = 2
+
+[spikes/litellm_p0/requirements-win-py313.lock.txt]
+end_of_line = crlf
+
+[assets/tokenizers/*]
+charset = unset
+end_of_line = unset
+insert_final_newline = unset

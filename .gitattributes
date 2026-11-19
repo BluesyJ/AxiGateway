@@ -1,0 +1,7 @@
+# Text uses LF in Git; hash-locked assets retain their original bytes.
+* text=auto eol=lf
+assets/tokenizers/* binary
+assets/tokenizers/README.md text diff merge eol=lf
+# The immutable original lock uses CRLF; archives keep original EOF whitespace.
+spikes/litellm_p0/requirements-win-py313.lock.txt -text whitespace=blank-at-eol,blank-at-eof,space-before-tab,cr-at-eol
+docs/legacy/* -text -whitespace

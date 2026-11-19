@@ -1,0 +1,12 @@
+# Source workspace: run modules from the repository root. No legacy wheel entry.
+[tool.pytest.ini_options]
+testpaths = ["tests_p1", "tests_p2", "tests_p3", "tests_p4"]
+addopts = "--strict-config --strict-markers"
+
+[tool.ruff]
+target-version = "py313"
+line-length = 88
+extend-exclude = [".cache", ".venv", ".venv-litellm"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "ANN"]

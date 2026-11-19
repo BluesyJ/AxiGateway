@@ -1,0 +1,67 @@
+{
+  "date": "2026-11-19",
+  "scope": "independent_minimal_collaboration_snapshot",
+  "ready_for_owner_review": true,
+  "real_model_calls": 0,
+  "fake_proxy_requests": 22,
+  "proxy_contracts": {
+    "passed": true,
+    "cases": 16,
+    "privacy_passed": true,
+    "database_privacy_matrix_passed": true,
+    "known_401_deviation_retained": true
+  },
+  "backend": {
+    "initial_passed": 76,
+    "initial_failed": 1,
+    "failure_category": "missing_acl_test_helper",
+    "rechecked_failed_cases": 1,
+    "recheck_passed": 1,
+    "final_retained_cases_passed": 77
+  },
+  "frontend": {
+    "typecheck": true,
+    "build": true,
+    "initial_browser_failure": "isolated_dist_not_prepared_404",
+    "browser_recheck_passed": 32,
+    "skipped": 0,
+    "desktop_states": 18,
+    "narrow_views": 6,
+    "synthetic_screenshots": 24,
+    "manual_visual_review": false,
+    "warnings": [
+      "large_chunk",
+      "dependency_use_client"
+    ]
+  },
+  "demo": {
+    "initial_failure": "development_interpreter_missing_pywin32",
+    "fixed_by": "verified_runtime_demo_entry",
+    "synthetic_rows": 144
+  },
+  "static_checks": {
+    "ruff_check": true,
+    "ruff_format_check": true,
+    "internal_links": true,
+    "ignore_rules": true,
+    "unexplained_secret_patterns": 0
+  },
+  "source_preservation": {
+    "files_checked": 303,
+    "all_unchanged": true,
+    "git_status_unchanged": true,
+    "head_unchanged": true,
+    "product_files_checked": 26,
+    "product_bytes_identical": true
+  },
+  "environments": {
+    "proxy": "fresh_install_from_original_hash_locked_wheels",
+    "frontend": "fresh_npm_ci_offline_original_lock",
+    "development": "existing_interpreter_tools_read_only",
+    "new_computer_restore_tested": false
+  },
+  "git_created": false,
+  "committed": false,
+  "pushed": false,
+  "stage_acceptance_changed": false
+}

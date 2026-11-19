@@ -1,0 +1,22 @@
+name: Feature request
+description: 提出需求或设计变更
+title: "feat: "
+labels: [enhancement]
+body:
+  - type: textarea
+    id: scenario
+    attributes:
+      label: 使用场景与来源
+      description: 说明客户反馈或业务背景，省略客户身份与私密资料。
+    validations:
+      required: true
+  - type: textarea
+    id: outcome
+    attributes:
+      label: 期望结果与验收条件
+    validations:
+      required: true
+  - type: textarea
+    id: scope
+    attributes:
+      label: 优先级、现有能力与涉及范围

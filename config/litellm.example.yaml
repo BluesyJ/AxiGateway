@@ -1,0 +1,6 @@
+# AxiGateway P1 profile; launcher emits the fixed LiteLLM config.
+# Credentials, callbacks, retries and database settings cannot be added here.
+model_alias: deepseek
+provider_model: deepseek/deepseek-chat
+api_base: https://api.deepseek.com/v1
+queue_capacity: 1024

@@ -1,0 +1,8 @@
+# Credentials are read from the launcher's environment. Retries/fallbacks stay off.
+models:
+  - model_alias: deepseek-v4-pro
+    provider_model: deepseek/deepseek-v4-pro
+  - model_alias: deepseek-flash
+    provider_model: deepseek/deepseek-flash
+api_base: https://api.deepseek.com/v1
+queue_capacity: 1024

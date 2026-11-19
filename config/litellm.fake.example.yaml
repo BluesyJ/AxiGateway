@@ -1,0 +1,5 @@
+# Development-only fake upstream; use the launcher with --offline.
+model_alias: deepseek
+provider_model: deepseek/deepseek-chat
+api_base: http://127.0.0.1:4001/v1
+queue_capacity: 1024
