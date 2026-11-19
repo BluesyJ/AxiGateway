@@ -11,7 +11,7 @@ from urllib.parse import unquote
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from axi_gateway.bootstrap import ASSETS, pins  # noqa: E402
+from axi_gateway.bootstrap import ASSETS, LOCK_RELATIVE, LOCK_SHA256, pins  # noqa: E402
 
 PRIVATE_DIRS = {
     ".cache",
@@ -97,6 +97,8 @@ def main() -> int:
             failures.append({"path": name, "reason": "private_file"})
             continue  # Do not read force-added private data.
         content = subprocess.check_output(["git", "show", ":" + name], cwd=ROOT)
+        if name == LOCK_RELATIVE and hashlib.sha256(content).hexdigest() != LOCK_SHA256:
+            failures.append({"path": name, "reason": "lock_hash"})
         if name.startswith("assets/tokenizers/") and Path(name).name in ASSETS:
             if hashlib.sha256(content).hexdigest() != ASSETS[Path(name).name]:
                 failures.append({"path": name, "reason": "asset_hash"})

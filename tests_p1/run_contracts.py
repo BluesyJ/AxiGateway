@@ -553,6 +553,7 @@ async def main(report_path: Path | None = None, *, p2_privacy: bool = False) -> 
                 results.append(row)
                 print(case, status, "observed", flush=True)
             fixture.mode, fixture.compressed = "normal", False
+            label_events_before = len(load_events(directory))
             for label in ("p1-client-a", "p1-client-b"):
                 response = await client.post(
                     url + "/v1/chat/completions",
@@ -566,6 +567,15 @@ async def main(report_path: Path | None = None, *, p2_privacy: bool = False) -> 
                     headers={**headers, "x-axi-client": label},
                 )
                 assert response.status_code == 200
+            # HTTP completion precedes the asynchronous SQLite commit. Establish
+            # a committed baseline before asserting that a rejection adds no row.
+            label_expected = label_events_before + 2
+            deadline = time.monotonic() + 5
+            while len(load_events(directory)) < label_expected:
+                if time.monotonic() >= deadline:
+                    raise AssertionError("label_events_not_committed")
+                await asyncio.sleep(0.05)
+            assert len(load_events(directory)) == label_expected
             # Client credentials/base must not escape the configured upstream.
             before = len(fixture.seen)
             events_before = len(load_events(directory))

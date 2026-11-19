@@ -26,6 +26,8 @@ git switch -c docs/customer-requirements
 
 CI 运行文件检查、Ruff、后端核心测试、假上游契约、前端构建及浏览器测试。修复失败后再合并。当前只有一个维护者，CODEOWNERS 用于标识责任人，不要求同一账号批准自己的 PR。
 
+当前账号套餐不支持私有仓库分支保护（2026-11-19 API 返回 403）。请通过 PR 合并，避免直接推送 main；升级到支持该功能的套餐后，可强制启用 PR、`windows-core` 检查及禁止强推/删除。
+
 测试命令见 [TESTING](docs/TESTING.md)。自动测试全部使用合成凭据与假上游，禁止在 CI 中配置真实模型 Key。LiteLLM 升级按照 AGENTS 的公告核对、批准、哈希锁和契约测试流程执行。
 
 ## 文档维护

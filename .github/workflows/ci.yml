@@ -80,4 +80,5 @@ jobs:
             .cache/core-tests.xml
             .cache/contracts.json
           retention-days: 7
+          include-hidden-files: true
           if-no-files-found: ignore
