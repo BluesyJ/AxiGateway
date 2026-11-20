@@ -26,6 +26,8 @@
 
 ## 已批准设计
 
+2026-11-20：用户授权本机规划并直接开发模型访问管理首个增量，PR 交由用户审核。D01/D09 的离线演示扩展见 SPEC 顶部及 [开发计划](docs/proposals/20261120-model-access.md)；下文 master 模式仍为默认基线。不得把该演示扩展用于真实流量或视为整个 P6/P7 完成。
+
 - D01：阶段一单 master key + 回环；不作为长期客户端凭据分发方案。client_label 自报不可信，可信 key_alias 来自 LiteLLM 鉴权且可空。后续可选 PostgreSQL + 虚拟 Key；不自研 Key，不用 SQLite 保存凭据。
 - D02/D03 只用 LiteLLM logging 回调。P4.0b 批准 1.106.5 非流式成功、客户端无断开标记、prompt 与 total 均为正的用量记 reported，升级必须重验。保留 D02 的可信 499 / ClientDisconnected 或清理后 metadata 标记，流式断开记 client_disconnected / estimated。缺用量与流式未断开沿用原分类，不采信请求自报。
 - D04 非 reported 的缓存与 reasoning 为 NULL。reported 优先读取合法原始命中/未命中，实报 miss 标 reported。缺少原始 miss 时，仅在 prompt 与 hit 均合法且 hit ≤ prompt 时推导，标 derived。reasoning 是 completion 子集。
@@ -83,7 +85,7 @@ PROGRESS 沿用“完成了什么 / 改动的文件 / 如何验证 / 待决问�
 
 产品目标见 [V3.3](docs/PROJECT_PROPOSAL.md)，任务交接见 [对齐提案](docs/proposals/20261120-enterprise-governance-v33.md)。双方均可承担方案、开发与复核，每项任务记录实现负责人、复核人、基线、文件范围及验收预算；角色随任务互换。开工前检查开放PR，重叠修改先协调。用户决定验收和合并，不自动合并、不承诺会话间自动同步。
 
-产品六阶段与工程P阶段分开管理，新增阶段及实施仍按现有准入规则处理。
+产品六阶段与工程P阶段分开管理，新增阶段及实施仍按现有准入规则处理。2026-11-20 用户简化协作：当前机器继续规划和实现，用户审核 PR 后决定合入 main；另一台机器开发前同步 main、检查开放 PR 和本机未提交改动。无需每项任务在两个聊天窗口往返认领，也不固定长期角色。
 
 ## 跨电脑接手与长期记忆（2026-11-12 用户要求）
 

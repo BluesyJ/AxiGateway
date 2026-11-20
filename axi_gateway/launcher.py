@@ -168,6 +168,11 @@ def main(
     )
     parser.add_argument("--data-dir", type=Path, default=ROOT / "data/p1")
     parser.add_argument("--port", type=int, default=4000)
+    parser.add_argument(
+        "--access-demo",
+        type=Path,
+        help="Offline signed-identity demo trust configuration",
+    )
     parser.add_argument("--drain-timeout", type=float, default=2.0)
     parser.add_argument(
         "--debug-jsonl", action="store_true", help="NON-PRODUCT metadata debug output"
@@ -183,6 +188,12 @@ def main(
     )
     args = parser.parse_args(argv)
     try:
+        if args.access_demo and (
+            not args.offline
+            or "demo" not in args.data_dir.resolve().parts
+            or args.copy_key
+        ):
+            raise StartupError("access_demo_requires_offline_demo_directory")
         if not sys.flags.no_site or not sys.flags.isolated:
             raise StartupError("use_python_isolated_no_site")
         if not 1 <= args.port <= 65535 or args.port == 8787:
@@ -263,6 +274,21 @@ def main(
         event_dir = data_dir / "events"
         private_event_directory(event_dir)
         settings = read_settings(args.config)
+        access = None
+        if args.access_demo:
+            from axi_gateway.access.identity import read_demo_config
+            from axi_gateway.access.policy import PolicyStore
+
+            try:
+                access = read_demo_config(args.access_demo.resolve(), ROOT)
+                if set(access.models) != {
+                    model["model_alias"] for model in configured_models(settings)
+                }:
+                    raise ValueError
+                PolicyStore(access.database, access.models).apps()
+            except Exception:
+                raise StartupError("invalid_access_demo_configuration") from None
+            os.environ["AXI_ACCESS_DEMO_CONFIG"] = str(args.access_demo.resolve())
         if master in str(settings) or upstream in str(settings):
             raise StartupError("credential_in_config")
         if args.offline and urlsplit(str(settings["api_base"])).hostname not in {
@@ -291,6 +317,7 @@ def main(
             {
                 "alias": settings.get("model_alias"),
                 "litellm_version": checked["litellm_version"],
+                "trusted_identity_mode": access is not None,
                 "aliases": [model["model_alias"] for model in models],
                 "priced_models": sorted(priced),
                 "price_version": "litellm-1.106.5:sha256:" + sha256(cost_path),
@@ -305,9 +332,12 @@ def main(
         import yaml
 
         runtime = data_dir / "proxy.runtime.yaml"
-        runtime.write_text(
-            yaml.safe_dump(proxy_configuration(settings)), encoding="utf8"
-        )
+        generated = proxy_configuration(settings)
+        if access is not None:
+            generated["general_settings"]["custom_auth"] = (
+                "axi_gateway.access.hook.authenticate"
+            )
+        runtime.write_text(yaml.safe_dump(generated), encoding="utf8")
         print(
             json.dumps(
                 {
