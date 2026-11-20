@@ -172,6 +172,7 @@ class Projector:
         credentials: tuple[str, ...] = (),
         aliases: tuple[str, ...] = (),
         litellm_version: str | None = None,
+        trusted_identity_mode: bool = False,
     ) -> None:
         self.alias, self.priced_models, self.price_version = (
             alias,
@@ -181,6 +182,7 @@ class Projector:
         self.credentials = credentials
         self.aliases = aliases
         self.litellm_version = litellm_version
+        self.trusted_identity_mode = trusted_identity_mode
 
     def rejected_before_upstream(self, kwargs: dict, success: bool) -> bool:
         """Use the server-stamped proxy gate marker, never status/text heuristics."""
@@ -243,7 +245,13 @@ class Projector:
         # A framework-default zero without proven usage is not evidence of free usage.
         if cost == 0 and usage.usage_source != "reported":
             cost = None
-        # No key_alias is trustworthy in the approved master-key-only mode.
+        # Only opt-in identity mode trusts the pinned Proxy's sanitized auth slot.
+        # Do not use the fallback request metadata or body for identity.
+        key_alias = (
+            label(get(get(params, "metadata"), "user_api_key_alias"), self.credentials)
+            if self.trusted_identity_mode and self.litellm_version == "1.106.5"
+            else None
+        )
         duration = None
         start_utc, end_utc = utc_time(start), utc_time(end)
         if start_utc is not None and end_utc is not None:
@@ -265,7 +273,7 @@ class Projector:
             end_utc.isoformat() if end_utc is not None else None,
             duration,
             labels,
-            None,
+            key_alias,
             alias,
             kwargs.get("stream") is True,
             "success" if success else "error",

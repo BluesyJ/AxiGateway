@@ -55,6 +55,7 @@ def create_callback() -> GatewayCallback:
             os.environ.get("LITELLM_MASTER_KEY", ""),
         ),
         litellm_version=settings["litellm_version"],
+        trusted_identity_mode=settings.get("trusted_identity_mode", False),
         aliases=tuple(settings.get("aliases", ())) if settings["alias"] is None else (),
     )
     collector = Collector(

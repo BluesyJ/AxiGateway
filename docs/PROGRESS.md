@@ -1,33 +1,27 @@
-# 工程进度 — 私有仓库初始化
+# P6 控制台登录 / P7 模型与 Key 管理 — 后端首个增量
 
-1. 本轮交付可供跨电脑协作的 GitHub 私有仓库，统一代码、需求提案和 PR 入口。
-2. 检查通过后上传；认证或仓库设置受限时记录具体限制，保留本地交付。
-3. 上限：2 轮、4 组检查、1 个工作日；检查文档与文件卫生、本地校验、远端提交和 CI/仓库设置，第二轮只修正失败项。
+日期：2026-11-20。用户授权当前机器直接规划开发，PR 由用户审核合并；基线 23ab597（包含 PR #1 文档）。
 
-范围：README/协作与安全说明、Issue/PR 模板、CODEOWNERS、GitHub Actions、仓库文件检查脚本、进度与来源清单。上传 AxiGateway-clean；原 AxiGateway 与历史标签保持原位。沿用现有依赖、业务实现与测试结果，模型调用 0 次。使用私有仓库，暂不选择开源许可证。
-
-历史整理记录见 archive/PROGRESS_20261119_SNAPSHOT.md。本轮用户已授权提交和上传。
+1. 验证原锁 LiteLLM 扩展能否承接可信应用身份、模型授权、RPM 与停用，为管理页面提供后端接口。
+2. 通过后提交本增量 PR；用户审核后再推进管理页面与正式登录，失败则保留结论，不扩大到工具广场。
+3. 上限：1 轮实现、1 次修复、20 个新增逻辑用例、100 次允许假调用、20 次拒绝探测、原 16 契约各一次、1 个工作日。已完成本轮，真实调用 0 次。
 
 ## 完成了什么
 
-创建 [BluesyJ/AxiGateway](https://github.com/BluesyJ/AxiGateway) 私有仓库，默认分支 main。整理首页、安装说明、贡献流程、安全说明、需求与缺陷模板、PR 模板和 CODEOWNERS。新增 Windows CI：文件卫生、Ruff、后端测试、假上游契约、前端构建及浏览器测试。全部 Actions 固定到提交 SHA，工作流权限为只读，无真实模型 Secrets。
-
-仓库仅启用 Squash 合并，合并后自动删除任务分支，开启依赖漏洞提醒；Actions 默认只读且禁止批准 PR。私有分支保护 API 返回 403，要求 GitHub Pro；当前由维护者遵守 PR 流程，不改为公开、不升级套餐。
+已实现离线模型管理后端与自动演示：可信应用身份、模型许可、RPM、停用、独立治理审计及管理 API。原 117 项锁不变。端口为 4000 数据面、8788 只读控制台、8789 管理面；自动演示使用空闲回环端口。交付见 [报告](P7_ACCESS_DELIVERY.md)，计划见 [提案](proposals/20261120-model-access.md)。
 
 ## 改动的文件
 
-README、AGENTS、START_HERE、CONTRIBUTING、SECURITY、docs/SETUP、docs/TESTING、docs/proposals/README、.github、.editorconfig、.gitattributes、scripts/check_repository.py 与对应测试。tests_p1/run_contracts.py 补齐标签请求的落库同步。业务源码、配置模板、依赖版本和哈希锁保持原样。Git 中普通文本统一 LF，锁与 tokenizer 资产保留原字节。
+新增 access/identity、policy、protocol、hook、server、两项启动/演示脚本和 tests_p7；修改 launcher、events、callbacks、pytest/CI 入口及当前导航文档。前端、legacy、8787、AstrBot 与所有依赖锁不变。
 
 ## 如何验证
 
-本轮本地完成仓库检查、3 项检查脚本测试、Ruff check/format 和 Git 空白检查。完整系统测试沿用整理记录：77 个后端用例、16 个假上游场景、32 个浏览器用例通过；首次云端执行结果见 [Actions](https://github.com/BluesyJ/AxiGateway/actions/workflows/ci.yml)。原快照证据保持原样，后续来源由 Git 提交追溯。
-
-[首轮 CI](https://github.com/BluesyJ/AxiGateway/actions/runs/44451362542) 的环境、静态检查和 77 项后端测试通过；16 场景运行后，拒绝测试的事件数量断言失败，前端步骤未执行。测试在两条标签请求返回后立刻取落库基线，遗漏异步提交等待。第二轮补充“恰好新增 2 行”的有界等待，再执行原拒绝断言；未删断言、未调整生产行为。复验结果以 Actions 对应提交为准。
+本机运行校验 117 包/13985 文件；修复后核心 90 项通过，Ruff 通过。完整演示 2 模型别名 × 2 应用、100 次允许假调用及 5 次拒绝通过；复核修复后额外 4 个拒绝探测上游 0。原 16 契约通过、假上游 22 次，401 已知偏差保留。完整演示与修复验证的源码时点分别写入 [结论 JSON](P7_ACCESS_RESULT.json)，不以原机证据代替。未改前端，本机未重复截图。
 
 ## 待决问题
 
-另一台电脑将客户建议整理为 docs/proposals/ 下的需求提案，通过 PR 讨论；产品阶段和范围沿用 ROADMAP。公开发布前确定许可证，新增功能按提案逐项批准。
+管理页面、正式登录及凭据发放/轮换为下一增量；Token/费用额度账本与企业 IdP 后续。旧 P4.2 未收尾入口、P4.3 对账、P4.4 本地模型继续延期。完整产品版本指标与许可证由负责人按发布安排验收。PR #1 历史 CI 通过，本增量 CI 以 PR 检查为准。
 
 ## 偏离 SPEC 的地方 / 不做的事
 
-原工程及历史资料保留原位。本轮不改业务规则，不接入真实模型，不操作 AstrBot 或原机服务，不上传数据、凭据和历史截图，不公开仓库、不发布版本。
+用户本次授权 P6/P7 前置能力，离线扩展已写 SPEC；原 master 模式与允许表不变。治理库不存凭据。无真实调用、无 enterprise/prisma、无正文/价格/Token 预算开发、无工具广场、无自动合并。另一台开发前同步 main 并检查开放 PR，无需跨窗口往返认领。

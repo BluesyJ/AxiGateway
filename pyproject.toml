@@ -1,6 +1,6 @@
 # Source workspace: run modules from the repository root. No legacy wheel entry.
 [tool.pytest.ini_options]
-testpaths = ["tests_p1", "tests_p2", "tests_p3", "tests_p4"]
+testpaths = ["tests_p1", "tests_p2", "tests_p3", "tests_p4", "tests_p7"]
 addopts = "--strict-config --strict-markers"
 
 [tool.ruff]
