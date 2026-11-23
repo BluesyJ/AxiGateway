@@ -9,6 +9,7 @@ import logging
 import math
 import os
 import re
+import secrets
 import site
 import sys
 from collections.abc import Callable
@@ -265,7 +266,11 @@ def main(
         site.addsitedir(str(venv / "Lib/site-packages"))
         from axi_gateway.secrets import copy_key, master_key, private_event_directory
 
-        master = master_key(data_dir / "master.key.dpapi")
+        master = (
+            "sk-axi-" + secrets.token_urlsafe(48)
+            if args.access_demo
+            else master_key(data_dir / "master.key.dpapi")
+        )
         if args.copy_key:
             copy_key(master)
             print(json.dumps({"event": "master_key_copied_to_clipboard"}))

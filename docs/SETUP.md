@@ -69,6 +69,28 @@ Pop-Location
 | `PUT /api/apps/{id}` | 完整替换 `models/rpm/enabled/expected_revision`；新建版本为 0，冲突返回 409 |
 | `GET /api/audit?limit=100` | 返回最近 1–100 条治理变更，不包含调用正文或凭据 |
 
-管理面只绑定 `127.0.0.1:8789`，无跨域；异常 Host/Origin 被拒。应用与管理 audience 分离，验证签名、issuer、有效期和管理员名单。RPM 按 UTC 自然分钟计准入请求，不是 Token/费用额度；停用阻断后续准入，不取消已发往上游的请求。8788 继续只读、无登录。下一增量接入管理页面与正式登录流程。
+管理面只绑定 `127.0.0.1:8789`，无跨域；异常 Host/Origin 被拒。应用与管理 audience 分离，验证签名、issuer、有效期和管理员名单。RPM 按 UTC 自然分钟计准入请求，不是 Token/费用额度；停用阻断后续准入，不取消已发往上游的请求。8788 继续只读、无登录。演示操作页面见下一节，正式登录流程后续开发。
 
 演示模式只接受标准聊天字段，字段清单见 `axi_gateway/access/protocol.py`；请求级备用路由、重试和上游配置扩展一律拒绝。`demo_access.py --rejections-only` 只执行 4 个拒绝探测，上游调用应为 0，适用于该边界的针对性复测。管理启动器拒绝 4000、8787、8788 等已保留端口。
+
+## 6. 内置 Playground 手动试用
+
+完成第 1 节的 Python 锁环境恢复，并使用 Node 24 构建前端：
+
+```powershell
+Set-Location console_ui
+npm.cmd ci --ignore-scripts --no-audit --no-fund
+npm.cmd run build
+Set-Location ..
+.\.venv-litellm\Scripts\python.exe -I -S scripts\start_playground.py
+```
+
+打开 <http://127.0.0.1:8790/>。若端口已占用，启动命令加 `--port 18790` 并打开对应地址；4000、8787、8788、8789 为保留端口。Ctrl+C 结束本次服务。所有服务仅监听 `127.0.0.1`，LiteLLM 和假上游使用临时端口。
+
+1. 「调用试验」选择阿汐模拟应用和模型 A，发送请求，查看固定假回复。改选模型 B 会因未授权而被拒。
+2. 「应用权限」给阿汐勾选模型 B 并保存，返回调用页再试。为知识库应用设置每分钟上限 1，在同一自然分钟内连续调用两次可看到 429；停用应用后新请求被拒。
+3. 「调用记录」查看 P2 元数据；「治理审计」查看授权、RPM 和停用的变更。刷新保留本次运行的数据；重启创建全新演示环境。
+
+每次运行独立保存到 `.cache/playground/<run>/demo/`：`demo-policy.sqlite3` 为策略和审计，`proxy/events/events.sqlite3` 为调用元数据。历史 demo 不覆盖，界面仅展示当前运行。输入正文不留存，JWT 不返回浏览器；私钥、token、上游凭据和离线演示 master key 均只在内存。调用回复与用量为合成数据，无真实模型调用。浏览器连接中断时，页面显示结果未知，可恢复连接后查看记录；事件仍是尽力投递。
+
+本机可访问该服务的操作员可以管理全部合成应用；本阶段没有正式管理登录。**不做的事**：真实上游配置、企业 IdP、Agent/MCP 执行、Key 发放、正文留存和 Token/费用额度。
