@@ -19,7 +19,7 @@ export default defineConfig({
     serviceWorkers: "block",
   },
   webServer: {
-    command: `"${resolve(root, ".venv-litellm/Scripts/python.exe")}" -I -S scripts/start_playground.py --port 18790`,
+    command: `"${resolve(root, ".venv-litellm/Scripts/python.exe")}" -I -S scripts/start_playground.py --port 18790 --models-dir .cache/playground-regression-models --offline-models`,
     cwd: root,
     url: "http://127.0.0.1:18790/",
     reuseExistingServer: false,

@@ -15,11 +15,14 @@ import {
   ShieldCheck,
   SlidersHorizontal,
   Terminal,
+  Server,
+  MessageSquare,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import "./style.css";
 import "./playground.css";
+import { ModelWorkspace } from "./models";
 
 type Policy = {
   id: string;
@@ -58,7 +61,7 @@ type Result = {
   app?: string;
   model?: string;
 };
-type View = "call" | "policies" | "events" | "audit";
+type View = "call" | "policies" | "events" | "audit" | "models" | "chat";
 const names: Record<string, string> = {
   "demo-app-a": "阿汐 · 模拟应用",
   "demo-app-b": "知识库 · 模拟应用",
@@ -237,6 +240,8 @@ function Playground() {
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState<Result | null>(null);
   const [notice, setNotice] = useState("");
+  const [modelRefresh, setModelRefresh] = useState(0);
+  const localView = view === "models" || view === "chat";
   async function refresh() {
     setLoading(true);
     setError("");
@@ -290,18 +295,24 @@ function Playground() {
     }
   }
   const nav = [
+    ["models", "我的模型", Server],
+    ["chat", "模型对话", MessageSquare],
     ["call", "调用试验", FlaskConical],
     ["policies", "应用权限", SlidersHorizontal],
     ["events", "调用记录", Activity],
     ["audit", "治理审计", History],
   ] as const;
   const titles = {
+    models: "我的模型",
+    chat: "模型对话",
     call: "模型 Playground",
     policies: "应用权限",
     events: "调用记录",
     audit: "治理审计",
   };
   const subtitles = {
+    models: "添加自己的 OpenAI 兼容模型，配置加密保存在本机。",
+    chat: "选择已添加的模型，进行连续对话测试。",
     call: "选一个应用，亲手验证模型访问规则。",
     policies: "为每个应用设置模型范围、调用上限和启用状态。",
     events: "读取当前演示环境的 P2 事件库，仅保留调用元数据。",
@@ -338,9 +349,9 @@ function Playground() {
         </nav>
         <div className="pg-sidebar-note">
           <ShieldCheck size={18} />
-          <strong>本机离线演示</strong>
-          <p>两套模拟应用，两个演示模型。所有模型回复均为合成示例。</p>
-          <span className="pg-tag">不连接真实模型</span>
+          <strong>本机工作区</strong>
+          <p>自有模型用于真实对话；应用权限与调用试验使用独立演示环境。</p>
+          <span className="pg-tag">仅本机操作</span>
         </div>
         <div className="pg-sidebar-bottom">
           <span className="pg-dot" />
@@ -354,7 +365,7 @@ function Playground() {
           </span>
           <span className="pg-tag">
             <FlaskConical size={13} />
-            DEMO
+            {localView ? "OPENAI COMPATIBLE" : "DEMO"}
           </span>
         </header>
         <main className="pg-main">
@@ -364,7 +375,12 @@ function Playground() {
               <h1>{titles[view]}</h1>
               <p>{subtitles[view]}</p>
             </div>
-            <Button onClick={() => void refresh()} disabled={loading}>
+            <Button
+              onClick={() =>
+                localView ? setModelRefresh((v) => v + 1) : void refresh()
+              }
+              disabled={!localView && loading}
+            >
               <RefreshCw size={15} className={loading ? "pg-spin" : ""} />
               刷新
             </Button>
@@ -372,11 +388,19 @@ function Playground() {
           <div className="pg-banner">
             <FlaskConical size={17} />
             <span>
-              当前为演示环境 · 无需真实 Key · 固定假回复 ·
-              本机操作员可管理合成应用
+              {localView
+                ? "本机模型测试 · 仅点击发送时调用所选服务 · 无企业登录"
+                : "当前为演示环境 · 无需真实 Key · 固定假回复 · 本机操作员可管理合成应用"}
             </span>
           </div>
-          {error && (
+          {localView && (
+            <ModelWorkspace
+              view={view}
+              refresh={modelRefresh}
+              goChat={() => setView("chat")}
+            />
+          )}
+          {!localView && error && (
             <Card className="pg-feedback" role="alert">
               <strong>
                 {state ? "刷新失败，当前显示上次数据" : "加载失败"}
@@ -385,334 +409,337 @@ function Playground() {
               <Button onClick={() => void refresh()}>重新加载</Button>
             </Card>
           )}
-          {!state ? (
-            !error && <Empty>正在加载演示环境…</Empty>
-          ) : (
-            <>
-              {notice && (
-                <div className="pg-notice" role="status">
-                  <Check size={16} />
-                  {notice}
-                </div>
-              )}
-              {view === "call" && (
-                <>
-                  <div className="pg-metrics">
-                    <div>
-                      <span>模拟应用</span>
-                      <strong>
-                        {state.apps.length}
-                        <small>个</small>
-                      </strong>
-                    </div>
-                    <div>
-                      <span>演示模型</span>
-                      <strong>
-                        {state.models.length}
-                        <small>个</small>
-                      </strong>
-                    </div>
-                    <div>
-                      <span>本次运行到达假上游</span>
-                      <strong data-testid="upstream-count">
-                        {state.upstream_calls}
-                        <small>次</small>
-                      </strong>
-                    </div>
+          {!localView &&
+            (!state ? (
+              !error && <Empty>正在加载演示环境…</Empty>
+            ) : (
+              <>
+                {notice && (
+                  <div className="pg-notice" role="status">
+                    <Check size={16} />
+                    {notice}
                   </div>
-                  {!state.apps.length || !state.models.length ? (
-                    <Empty>暂无可用的演示应用或模型。</Empty>
-                  ) : (
-                    <div className="pg-call-grid">
-                      <Card className="pg-input-card">
-                        <div className="pg-card-title">
-                          <span className="pg-step">01</span>
-                          <h2>发起调用</h2>
-                        </div>
-                        <form onSubmit={send}>
-                          <div className="pg-two-fields">
-                            <label className="pg-field">
-                              应用身份
-                              <select
-                                value={app}
-                                onChange={(e) => {
-                                  setApp(e.target.value);
-                                  setResult(null);
-                                }}
-                              >
-                                {state.apps.map((p) => (
-                                  <option key={p.id} value={p.id}>
-                                    {names[p.id] ?? p.id}
-                                  </option>
-                                ))}
-                              </select>
-                            </label>
-                            <label className="pg-field">
-                              调用模型
-                              <select
-                                value={model}
-                                onChange={(e) => {
-                                  setModel(e.target.value);
-                                  setResult(null);
-                                }}
-                              >
-                                {state.models.map((m) => (
-                                  <option key={m} value={m}>
-                                    {modelNames[m] ?? m}
-                                  </option>
-                                ))}
-                              </select>
-                            </label>
-                          </div>
-                          <div className="pg-policy-hint">
-                            <span
-                              className={
-                                policy?.enabled ? "pg-dot" : "pg-dot off"
-                              }
-                            />
-                            {policy?.enabled ? "应用已启用" : "应用已停用"}
-                            <span>·</span>
-                            <span>{policy?.rpm ?? "—"} 次 / 分钟</span>
-                            <button
-                              type="button"
-                              onClick={() => setView("policies")}
-                            >
-                              调整权限
-                              <ArrowUpRight size={13} />
-                            </button>
-                          </div>
-                          <label className="pg-field">
-                            测试输入
-                            <textarea
-                              value={prompt}
-                              onChange={(e) => setPrompt(e.target.value)}
-                              maxLength={4096}
-                              rows={7}
-                              placeholder="输入一条测试消息…"
-                            />
-                          </label>
-                          <div className="pg-input-footer">
-                            <small>内容仅用于本次请求，不写入事件库。</small>
-                            <span>{prompt.length} / 4096</span>
-                          </div>
-                          <Button
-                            className="pg-send"
-                            type="submit"
-                            disabled={busy || !prompt.trim()}
-                          >
-                            {busy ? (
-                              <LoaderCircle className="pg-spin" />
-                            ) : (
-                              <Send size={16} />
-                            )}
-                            {busy ? "正在调用…" : "发送测试请求"}
-                          </Button>
-                        </form>
-                      </Card>
-                      <Card className="pg-result-card">
-                        <div className="pg-card-title">
-                          <span className="pg-step">02</span>
-                          <h2>调用结果</h2>
-                          {result && (
-                            <span
-                              className={
-                                result.status === 200
-                                  ? "pg-tag good"
-                                  : "pg-tag bad"
-                              }
-                            >
-                              {result.status == null
-                                ? "未收到可用结果"
-                                : `HTTP ${result.status}`}
-                            </span>
-                          )}
-                        </div>
-                        {busy ? (
-                          <Empty>请求正在经过网关…</Empty>
-                        ) : !result ? (
-                          <Empty>发送请求后，在这里查看回复或拒绝原因。</Empty>
-                        ) : (
-                          <div className="pg-result" aria-live="polite">
-                            <div
-                              className={
-                                result.status === 200
-                                  ? "pg-result-icon"
-                                  : "pg-result-icon rejected"
-                              }
-                            >
-                              {result.status === 200 ? (
-                                <Bot size={25} />
-                              ) : (
-                                <ShieldCheck size={25} />
-                              )}
-                            </div>
-                            <h3>
-                              {result.status === 200
-                                ? "请求已放行"
-                                : result.status == null
-                                  ? "调用结果未知"
-                                  : "请求未完成"}
-                            </h3>
-                            <p data-testid="call-result">
-                              {result.reply ?? description(result.error)}
-                            </p>
-                            <div className="pg-result-meta">
-                              <span>
-                                应用{" "}
-                                <code>
-                                  <Value value={result.app} />
-                                </code>
-                              </span>
-                              <span>
-                                模型{" "}
-                                <code>
-                                  <Value value={result.model} />
-                                </code>
-                              </span>
-                              <span>
-                                耗时 <Value value={result.duration_ms} /> ms
-                              </span>
-                            </div>
-                          </div>
-                        )}
-                      </Card>
+                )}
+                {view === "call" && (
+                  <>
+                    <div className="pg-metrics">
+                      <div>
+                        <span>模拟应用</span>
+                        <strong>
+                          {state.apps.length}
+                          <small>个</small>
+                        </strong>
+                      </div>
+                      <div>
+                        <span>演示模型</span>
+                        <strong>
+                          {state.models.length}
+                          <small>个</small>
+                        </strong>
+                      </div>
+                      <div>
+                        <span>本次运行到达假上游</span>
+                        <strong data-testid="upstream-count">
+                          {state.upstream_calls}
+                          <small>次</small>
+                        </strong>
+                      </div>
                     </div>
-                  )}
-                  <div className="pg-guide">
-                    <strong>试一试权限控制</strong>
-                    <p>
-                      切换到模型 B，观察阿汐被拒绝；在「应用权限」中授予模型 B
-                      后再试。将上限改为
-                      1，连续发送两次观察限流；停用应用后再次调用。
-                    </p>
-                  </div>
-                </>
-              )}
-              {view === "policies" &&
-                (state.apps.length ? (
-                  <div className="pg-policy-grid">
-                    {state.apps.map((p) => (
-                      <PolicyEditor
-                        key={p.id + p.revision}
-                        policy={p}
-                        models={state.models}
-                        saved={async () => {
-                          await refresh();
-                          setNotice("设置已保存，后续请求按新规则检查。");
-                        }}
-                      />
-                    ))}
-                  </div>
-                ) : (
-                  <Empty>暂无演示应用。</Empty>
-                ))}
-              {view === "events" &&
-                (eventError ? (
-                  <Card className="pg-feedback" role="alert">
-                    <strong>调用记录加载失败</strong>
-                    <p>{eventError}</p>
-                  </Card>
-                ) : !events.length ? (
-                  <Empty>暂无调用记录，先发送一次获准的测试请求。</Empty>
-                ) : (
-                  <Card className="pg-table-card">
-                    <div className="pg-card-title">
-                      <h2>最近调用</h2>
-                      <small>最多 50 条 · 用量为合成数据</small>
-                    </div>
-                    <div className="pg-table-scroll">
-                      <table>
-                        <thead>
-                          <tr>
-                            <th>本地时间</th>
-                            <th>应用身份</th>
-                            <th>模型</th>
-                            <th>结果</th>
-                            <th>Token</th>
-                            <th>用量来源</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {events.map((e) => (
-                            <tr key={e.litellm_call_id}>
-                              <td>{localTime(e.started_at)}</td>
-                              <td>
-                                <Value value={e.key_alias} />
-                              </td>
-                              <td>
-                                {modelNames[e.model_alias] ?? e.model_alias}
-                              </td>
-                              <td>
-                                <span className="pg-tag">
-                                  {e.provider_outcome}
-                                </span>
-                              </td>
-                              <td>
-                                <Value value={e.total_tokens} />
-                              </td>
-                              <td>{e.usage_source}</td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  </Card>
-                ))}
-              {view === "audit" &&
-                (state.audit.length ? (
-                  <Card className="pg-table-card">
-                    <div className="pg-card-title">
-                      <h2>管理操作</h2>
-                      <small>最近 50 条</small>
-                    </div>
-                    <div className="pg-table-scroll">
-                      <table>
-                        <thead>
-                          <tr>
-                            <th>本地时间</th>
-                            <th>操作员 / 应用</th>
-                            <th>模型授权</th>
-                            <th>每分钟上限</th>
-                            <th>状态</th>
-                            <th>版本</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {state.audit.map((a) => (
-                            <tr key={a.sequence}>
-                              <td>{localTime(a.at_utc)}</td>
-                              <td>
-                                <small>{a.actor}</small>
-                                <br />
-                                {a.target}
-                              </td>
-                              <td>
-                                {a.models
-                                  .map((m) => modelNames[m] ?? m)
-                                  .join("、") || "无"}
-                              </td>
-                              <td>{a.rpm}</td>
-                              <td>
-                                <span
-                                  className={
-                                    a.enabled ? "pg-tag good" : "pg-tag bad"
-                                  }
+                    {!state.apps.length || !state.models.length ? (
+                      <Empty>暂无可用的演示应用或模型。</Empty>
+                    ) : (
+                      <div className="pg-call-grid">
+                        <Card className="pg-input-card">
+                          <div className="pg-card-title">
+                            <span className="pg-step">01</span>
+                            <h2>发起调用</h2>
+                          </div>
+                          <form onSubmit={send}>
+                            <div className="pg-two-fields">
+                              <label className="pg-field">
+                                应用身份
+                                <select
+                                  value={app}
+                                  onChange={(e) => {
+                                    setApp(e.target.value);
+                                    setResult(null);
+                                  }}
                                 >
-                                  {a.enabled ? "启用" : "停用"}
+                                  {state.apps.map((p) => (
+                                    <option key={p.id} value={p.id}>
+                                      {names[p.id] ?? p.id}
+                                    </option>
+                                  ))}
+                                </select>
+                              </label>
+                              <label className="pg-field">
+                                调用模型
+                                <select
+                                  value={model}
+                                  onChange={(e) => {
+                                    setModel(e.target.value);
+                                    setResult(null);
+                                  }}
+                                >
+                                  {state.models.map((m) => (
+                                    <option key={m} value={m}>
+                                      {modelNames[m] ?? m}
+                                    </option>
+                                  ))}
+                                </select>
+                              </label>
+                            </div>
+                            <div className="pg-policy-hint">
+                              <span
+                                className={
+                                  policy?.enabled ? "pg-dot" : "pg-dot off"
+                                }
+                              />
+                              {policy?.enabled ? "应用已启用" : "应用已停用"}
+                              <span>·</span>
+                              <span>{policy?.rpm ?? "—"} 次 / 分钟</span>
+                              <button
+                                type="button"
+                                onClick={() => setView("policies")}
+                              >
+                                调整权限
+                                <ArrowUpRight size={13} />
+                              </button>
+                            </div>
+                            <label className="pg-field">
+                              测试输入
+                              <textarea
+                                value={prompt}
+                                onChange={(e) => setPrompt(e.target.value)}
+                                maxLength={4096}
+                                rows={7}
+                                placeholder="输入一条测试消息…"
+                              />
+                            </label>
+                            <div className="pg-input-footer">
+                              <small>内容仅用于本次请求，不写入事件库。</small>
+                              <span>{prompt.length} / 4096</span>
+                            </div>
+                            <Button
+                              className="pg-send"
+                              type="submit"
+                              disabled={busy || !prompt.trim()}
+                            >
+                              {busy ? (
+                                <LoaderCircle className="pg-spin" />
+                              ) : (
+                                <Send size={16} />
+                              )}
+                              {busy ? "正在调用…" : "发送测试请求"}
+                            </Button>
+                          </form>
+                        </Card>
+                        <Card className="pg-result-card">
+                          <div className="pg-card-title">
+                            <span className="pg-step">02</span>
+                            <h2>调用结果</h2>
+                            {result && (
+                              <span
+                                className={
+                                  result.status === 200
+                                    ? "pg-tag good"
+                                    : "pg-tag bad"
+                                }
+                              >
+                                {result.status == null
+                                  ? "未收到可用结果"
+                                  : `HTTP ${result.status}`}
+                              </span>
+                            )}
+                          </div>
+                          {busy ? (
+                            <Empty>请求正在经过网关…</Empty>
+                          ) : !result ? (
+                            <Empty>
+                              发送请求后，在这里查看回复或拒绝原因。
+                            </Empty>
+                          ) : (
+                            <div className="pg-result" aria-live="polite">
+                              <div
+                                className={
+                                  result.status === 200
+                                    ? "pg-result-icon"
+                                    : "pg-result-icon rejected"
+                                }
+                              >
+                                {result.status === 200 ? (
+                                  <Bot size={25} />
+                                ) : (
+                                  <ShieldCheck size={25} />
+                                )}
+                              </div>
+                              <h3>
+                                {result.status === 200
+                                  ? "请求已放行"
+                                  : result.status == null
+                                    ? "调用结果未知"
+                                    : "请求未完成"}
+                              </h3>
+                              <p data-testid="call-result">
+                                {result.reply ?? description(result.error)}
+                              </p>
+                              <div className="pg-result-meta">
+                                <span>
+                                  应用{" "}
+                                  <code>
+                                    <Value value={result.app} />
+                                  </code>
                                 </span>
-                              </td>
-                              <td>{a.revision}</td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
+                                <span>
+                                  模型{" "}
+                                  <code>
+                                    <Value value={result.model} />
+                                  </code>
+                                </span>
+                                <span>
+                                  耗时 <Value value={result.duration_ms} /> ms
+                                </span>
+                              </div>
+                            </div>
+                          )}
+                        </Card>
+                      </div>
+                    )}
+                    <div className="pg-guide">
+                      <strong>试一试权限控制</strong>
+                      <p>
+                        切换到模型 B，观察阿汐被拒绝；在「应用权限」中授予模型 B
+                        后再试。将上限改为
+                        1，连续发送两次观察限流；停用应用后再次调用。
+                      </p>
                     </div>
-                  </Card>
-                ) : (
-                  <Empty>暂无管理操作记录。</Empty>
-                ))}
-            </>
-          )}
+                  </>
+                )}
+                {view === "policies" &&
+                  (state.apps.length ? (
+                    <div className="pg-policy-grid">
+                      {state.apps.map((p) => (
+                        <PolicyEditor
+                          key={p.id + p.revision}
+                          policy={p}
+                          models={state.models}
+                          saved={async () => {
+                            await refresh();
+                            setNotice("设置已保存，后续请求按新规则检查。");
+                          }}
+                        />
+                      ))}
+                    </div>
+                  ) : (
+                    <Empty>暂无演示应用。</Empty>
+                  ))}
+                {view === "events" &&
+                  (eventError ? (
+                    <Card className="pg-feedback" role="alert">
+                      <strong>调用记录加载失败</strong>
+                      <p>{eventError}</p>
+                    </Card>
+                  ) : !events.length ? (
+                    <Empty>暂无调用记录，先发送一次获准的测试请求。</Empty>
+                  ) : (
+                    <Card className="pg-table-card">
+                      <div className="pg-card-title">
+                        <h2>最近调用</h2>
+                        <small>最多 50 条 · 用量为合成数据</small>
+                      </div>
+                      <div className="pg-table-scroll">
+                        <table>
+                          <thead>
+                            <tr>
+                              <th>本地时间</th>
+                              <th>应用身份</th>
+                              <th>模型</th>
+                              <th>结果</th>
+                              <th>Token</th>
+                              <th>用量来源</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {events.map((e) => (
+                              <tr key={e.litellm_call_id}>
+                                <td>{localTime(e.started_at)}</td>
+                                <td>
+                                  <Value value={e.key_alias} />
+                                </td>
+                                <td>
+                                  {modelNames[e.model_alias] ?? e.model_alias}
+                                </td>
+                                <td>
+                                  <span className="pg-tag">
+                                    {e.provider_outcome}
+                                  </span>
+                                </td>
+                                <td>
+                                  <Value value={e.total_tokens} />
+                                </td>
+                                <td>{e.usage_source}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </Card>
+                  ))}
+                {view === "audit" &&
+                  (state.audit.length ? (
+                    <Card className="pg-table-card">
+                      <div className="pg-card-title">
+                        <h2>管理操作</h2>
+                        <small>最近 50 条</small>
+                      </div>
+                      <div className="pg-table-scroll">
+                        <table>
+                          <thead>
+                            <tr>
+                              <th>本地时间</th>
+                              <th>操作员 / 应用</th>
+                              <th>模型授权</th>
+                              <th>每分钟上限</th>
+                              <th>状态</th>
+                              <th>版本</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {state.audit.map((a) => (
+                              <tr key={a.sequence}>
+                                <td>{localTime(a.at_utc)}</td>
+                                <td>
+                                  <small>{a.actor}</small>
+                                  <br />
+                                  {a.target}
+                                </td>
+                                <td>
+                                  {a.models
+                                    .map((m) => modelNames[m] ?? m)
+                                    .join("、") || "无"}
+                                </td>
+                                <td>{a.rpm}</td>
+                                <td>
+                                  <span
+                                    className={
+                                      a.enabled ? "pg-tag good" : "pg-tag bad"
+                                    }
+                                  >
+                                    {a.enabled ? "启用" : "停用"}
+                                  </span>
+                                </td>
+                                <td>{a.revision}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </Card>
+                  ) : (
+                    <Empty>暂无管理操作记录。</Empty>
+                  ))}
+              </>
+            ))}
           <footer className="pg-footer">
             <span>ItbigtecGateway · Playground</span>
             <span>

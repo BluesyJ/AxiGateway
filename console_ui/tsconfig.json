@@ -20,6 +20,8 @@
     "e2e",
     "acceptance",
     "playground.config.ts",
-    "playground-tests"
+    "playground-tests",
+    "models.config.ts",
+    "model-tests"
   ]
 }

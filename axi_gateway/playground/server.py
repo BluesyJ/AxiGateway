@@ -22,7 +22,7 @@ from p3_console.server import CSP
 
 
 class DemoGate:
-    """Allow local assets and same-origin API access to synthetic data only."""
+    """Allow local assets and same-origin operator requests only."""
 
     def __init__(self, app: ASGIApp, port: int) -> None:
         self.app, self.host = app, f"127.0.0.1:{port}"
@@ -57,7 +57,7 @@ class DemoGate:
             origins and origins != ["http://" + self.host]
         ):
             status = 403
-        elif scope["method"] not in {"GET", "POST", "PUT"}:
+        elif scope["method"] not in {"GET", "POST", "PUT", "DELETE"}:
             status = 405
         elif scope["path"].startswith("/api/") and values(b"x-playground") != ["1"]:
             status = 403
@@ -71,14 +71,14 @@ class DemoGate:
             await self.app(scope, receive, secured)
 
 
-async def body(request: Request) -> dict:
+async def body(request: Request, limit: int = 32768) -> dict:
     """Bound the browser's JSON input before it reaches management or inference."""
     if request.headers.get("content-type", "").split(";")[0] != "application/json":
         raise PolicyError(400, "json_required")
     data = bytearray()
     async for chunk in request.stream():
         data.extend(chunk)
-        if len(data) > 32768:
+        if len(data) > limit:
             raise PolicyError(413, "request_too_large")
     try:
         result = json.loads(data)
@@ -90,7 +90,11 @@ async def body(request: Request) -> dict:
 
 
 def create_app(
-    session: DemoSession, port: int, dist: Path, proxy: httpx.AsyncClient
+    session: DemoSession,
+    port: int,
+    dist: Path,
+    proxy: httpx.AsyncClient,
+    local_routes: list[Route] | None = None,
 ) -> ASGIApp:
     """Mount the small demo bridge, existing governance API and compiled UI."""
     manager = management_app(
@@ -222,6 +226,7 @@ def create_app(
             Route("/api/demo/events", events),
             Route("/api/demo/apps/{app}", update, methods=["PUT"]),
             Route("/api/demo/call", call, methods=["POST"]),
+            *(local_routes or []),
         ],
         exception_handlers={PolicyError: error},
     )

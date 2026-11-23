@@ -20,7 +20,19 @@ def main() -> int:
     """Validate the pinned environment and serve only on IPv4 loopback."""
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--port", type=int, default=8790)
+    parser.add_argument("--models-dir", type=Path, default=ROOT / "data/playground")
+    parser.add_argument(
+        "--offline-models",
+        action="store_true",
+        help="Test profile: model subprocesses may connect only to loopback",
+    )
     args = parser.parse_args()
+    model_directory = args.models_dir.resolve()
+    if not any(
+        model_directory.is_relative_to(ROOT / name) for name in ("data", ".cache")
+    ):
+        print(json.dumps({"error": "invalid_models_directory"}))
+        return 1
     if not sys.flags.isolated or not sys.flags.no_site:
         print(json.dumps({"error": "use_python_isolated_no_site"}))
         return 1
@@ -48,6 +60,9 @@ def main() -> int:
     site.addsitedir(str(ROOT / ".venv-litellm/Lib/site-packages"))
     import uvicorn
 
+    from axi_gateway.playground.model_api import model_routes
+    from axi_gateway.playground.model_runtime import ModelRuntime
+    from axi_gateway.playground.models import ModelStore
     from axi_gateway.playground.runtime import runtime
     from axi_gateway.playground.server import create_app
 
@@ -55,9 +70,17 @@ def main() -> int:
 
     async def run() -> None:
         async with runtime(ROOT) as (session, proxy):
+            store = await asyncio.to_thread(ModelStore, model_directory)
+            models = ModelRuntime(ROOT, store, args.offline_models)
             server = uvicorn.Server(
                 uvicorn.Config(
-                    create_app(session, args.port, ROOT / "console_ui/dist", proxy),
+                    create_app(
+                        session,
+                        args.port,
+                        ROOT / "console_ui/dist",
+                        proxy,
+                        model_routes(store, models),
+                    ),
                     host="127.0.0.1",
                     port=args.port,
                     access_log=False,
@@ -71,12 +94,15 @@ def main() -> int:
                     {
                         "event": "playground_ready",
                         "url": f"http://127.0.0.1:{args.port}/",
-                        "demo": True,
+                        "modes": ["demo", "local_models"],
                     }
                 ),
                 flush=True,
             )
-            await server.serve(sockets=[listener])
+            try:
+                await server.serve(sockets=[listener])
+            finally:
+                await models.close()
 
     try:
         asyncio.run(run())

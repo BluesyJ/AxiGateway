@@ -71,7 +71,8 @@ def read_settings(path: Path) -> dict[str, object]:
             raise StartupError("duplicate_model_alias")
         aliases.add(alias)
         if not isinstance(model["provider_model"], str) or not re.fullmatch(
-            r"deepseek/[A-Za-z0-9_.-]{1,64}", model["provider_model"]
+            r"(?:deepseek/[A-Za-z0-9_.-]{1,64}|openai/[A-Za-z0-9][A-Za-z0-9_.:/-]{0,159})",
+            model["provider_model"],
         ):
             raise StartupError("unsupported_provider_profile")
     if not isinstance(data["api_base"], str):
