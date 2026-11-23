@@ -3,16 +3,19 @@
 import asyncio
 import os
 import socket
+import sqlite3
 import subprocess
 import time
 from pathlib import Path
 from urllib.parse import urlsplit
+from uuid import uuid4
 
 import httpx
 import yaml
 
 from axi_gateway.access.policy import PolicyError
 from axi_gateway.playground.models import ModelStore
+from axi_gateway.playground.monitor import Monitor
 from axi_gateway.secrets import master_key, private_event_directory
 
 
@@ -138,47 +141,92 @@ class ModelRuntime:
             raise
 
     async def chat(self, data: dict) -> dict:
-        """Send one explicit request; do not probe, retry or persist message bodies."""
+        """Send one explicit request and correlate local context with P2 telemetry."""
         async with self.lock:
             model = await asyncio.to_thread(self.store.selected, data["model"])
             if data["revision"] != model["revision"]:
                 raise PolicyError(409, "model_configuration_changed")
+            call_id = str(uuid4())
             started = time.monotonic()
+            monitor = Monitor(self.store.directory)
+            recorded, result, reply, error = True, "unknown", None, None
+            content_status = "disabled"
+            snapshot = {k: model[k] for k in ("id", "name", "model", "revision")}
+            if model["key"]:
+                for key in ("name", "model"):
+                    snapshot[key] = snapshot[key].replace(model["key"], "[已隐藏凭据]")
             try:
-                await self._start(model)
-                response = await self.client.post(
-                    "/v1/chat/completions",
-                    headers={"Authorization": "Bearer " + self.master},
-                    json=dict(
-                        model=model["id"],
-                        messages=data["messages"],
-                        max_tokens=data["max_tokens"],
-                        stream=False,
-                    ),
-                )
-            except (httpx.HTTPError, TimeoutError, OSError):
-                raise PolicyError(503, "model_connection_failed") from None
-            if response.status_code != 200:
-                code = {
-                    401: "upstream_auth_failed",
-                    403: "upstream_access_denied",
-                    429: "upstream_rate_limited",
-                }.get(response.status_code, "upstream_request_failed")
-                raise PolicyError(
-                    response.status_code if 400 <= response.status_code <= 599 else 502,
-                    code,
-                )
+                await asyncio.to_thread(monitor.begin, call_id, snapshot)
+            except (OSError, sqlite3.Error):
+                recorded = False
             try:
-                reply = response.json()["choices"][0]["message"]["content"]
-                if not isinstance(reply, str) or not reply:
-                    raise ValueError
-            except (ValueError, KeyError, IndexError, TypeError):
-                raise PolicyError(502, "model_no_text_reply") from None
-            for secret in (model["key"], self.master):
-                if secret:
-                    reply = reply.replace(secret, "[已隐藏凭据]")
+                reply = await self._request(model, data, call_id)
+                result = "success"
+            except PolicyError as exc:
+                error = exc.code
+                result = "unknown" if error == "model_connection_failed" else "error"
+                raise
+            finally:
+                elapsed = round((time.monotonic() - started) * 1000)
+                if recorded:
+                    try:
+                        content_status = await asyncio.to_thread(
+                            monitor.finish,
+                            call_id,
+                            result,
+                            elapsed,
+                            data["messages"],
+                            reply,
+                            data.get("save_content", False),
+                            (model["key"], self.master),
+                            error,
+                        )
+                    except (OSError, sqlite3.Error):
+                        recorded = False
             return dict(
                 reply=reply,
                 model=model["id"],
-                duration_ms=round((time.monotonic() - started) * 1000),
+                duration_ms=elapsed,
+                call_id=call_id,
+                content_status=content_status,
+                recording_failed=not recorded,
             )
+
+    async def _request(self, model: dict, data: dict, call_id: str) -> str:
+        try:
+            await self._start(model)
+            response = await self.client.post(
+                "/v1/chat/completions",
+                headers={
+                    "Authorization": "Bearer " + self.master,
+                    "x-litellm-call-id": call_id,
+                },
+                json=dict(
+                    model=model["id"],
+                    messages=data["messages"],
+                    max_tokens=data["max_tokens"],
+                    stream=False,
+                ),
+            )
+        except (httpx.HTTPError, TimeoutError, OSError):
+            raise PolicyError(503, "model_connection_failed") from None
+        if response.status_code != 200:
+            code = {
+                401: "upstream_auth_failed",
+                403: "upstream_access_denied",
+                429: "upstream_rate_limited",
+            }.get(response.status_code, "upstream_request_failed")
+            raise PolicyError(
+                response.status_code if 400 <= response.status_code <= 599 else 502,
+                code,
+            )
+        try:
+            reply = response.json()["choices"][0]["message"]["content"]
+            if not isinstance(reply, str) or not reply:
+                raise ValueError
+        except (ValueError, KeyError, IndexError, TypeError):
+            raise PolicyError(502, "model_no_text_reply") from None
+        for secret in (model["key"], self.master):
+            if secret:
+                reply = reply.replace(secret, "[已隐藏凭据]")
+        return reply

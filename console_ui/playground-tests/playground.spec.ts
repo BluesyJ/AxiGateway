@@ -5,7 +5,7 @@ import { resolve } from "node:path";
 const shots = resolve("../.cache/playground-screenshots");
 mkdirSync(shots, { recursive: true });
 const headers = { "X-Playground": "1", Origin: "http://127.0.0.1:18790" };
-const tabs = ["调用试验", "应用权限", "调用记录", "治理审计"];
+const tabs = ["调用试验", "应用权限", "演示调用记录", "演示治理审计"];
 async function shot(page: Page, name: string) {
   await page.screenshot({
     path: resolve(shots, name + ".png"),
@@ -33,9 +33,10 @@ test("manual authorization, request-count limit, disable, history and audit", as
   const errors: string[] = [];
   page.on("pageerror", (error) => errors.push(error.message));
   await page.goto("/");
+  await tab(page, "调用试验");
   await expect(page.getByRole("combobox", { name: "应用身份" })).toBeVisible();
   await shot(page, "call-empty");
-  await tab(page, "调用记录");
+  await tab(page, "演示调用记录");
   await expect(
     page.getByText("暂无调用记录，先发送一次获准的测试请求。"),
   ).toBeVisible();
@@ -79,17 +80,18 @@ test("manual authorization, request-count limit, disable, history and audit", as
   await axi.getByRole("button", { name: "保存设置" }).click();
   await expect(page.getByRole("status")).toContainText("设置已保存");
   await page.reload();
+  await tab(page, "调用试验");
   await expect(
     page.getByRole("button", { name: "发送测试请求" }),
   ).toBeVisible();
   await call(page, 403);
-  await tab(page, "调用记录");
+  await tab(page, "演示调用记录");
   await expect(async () => {
     await page.getByRole("button", { name: "刷新", exact: true }).click();
     await expect(page.locator("tbody tr")).toHaveCount(3);
   }).toPass({ timeout: 5000 });
   await shot(page, "events-normal");
-  await tab(page, "治理审计");
+  await tab(page, "演示治理审计");
   await expect(page.locator("tbody tr")).toHaveCount(5);
   await shot(page, "audit-normal");
   const state = await page.request.get("/api/demo/state", { headers });
@@ -107,6 +109,7 @@ test("empty states for all views", async ({ page }) => {
     route.fulfill({ json: { events: [] } }),
   );
   await page.goto("/");
+  await tab(page, "调用试验");
   for (const name of tabs) {
     await tab(page, name);
     await expect(page.locator(".pg-empty")).toBeVisible();
@@ -119,6 +122,7 @@ test("service failure stays visible on every view", async ({ page }) => {
     route.fulfill({ status: 503, json: { error: "policy_store_unavailable" } }),
   );
   await page.goto("/");
+  await tab(page, "调用试验");
   for (const name of tabs) {
     await tab(page, name);
     await expect(page.getByRole("alert")).toContainText("加载失败");
@@ -154,10 +158,11 @@ test("unknown metadata, loading and narrow layout", async ({ page }) => {
     }),
   );
   await page.goto("/");
+  await tab(page, "调用试验");
   await expect(page.getByText("正在加载演示环境…")).toBeVisible();
   await shot(page, "loading");
   release();
-  await tab(page, "调用记录");
+  await tab(page, "演示调用记录");
   await expect(page.locator('span[title="未知"]')).toHaveCount(2);
   await shot(page, "events-unknown");
   await page.setViewportSize({ width: 390, height: 844 });
@@ -187,6 +192,7 @@ test("browser transport failure preserves submitted identity and unknown outcome
   page,
 }) => {
   await page.goto("/");
+  await tab(page, "调用试验");
   await expect(page.getByRole("combobox", { name: "应用身份" })).toBeVisible();
   let release: () => void = () => {};
   const pending = new Promise<void>((resolve) => {

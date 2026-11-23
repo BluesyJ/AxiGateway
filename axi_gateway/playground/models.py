@@ -1,8 +1,11 @@
 """Current-user encrypted model settings, separate from telemetry and demo data."""
 
+from __future__ import annotations
+
 import json
 import re
 import threading
+from datetime import UTC, datetime
 from pathlib import Path
 from urllib.parse import urlsplit
 from uuid import uuid4
@@ -66,12 +69,16 @@ class ModelStore:
 
         try:
             if not self.path.exists():
-                return {}
+                return {"version": 2, "models": {}, "audit": []}
             _, clear = win32crypt.CryptUnprotectData(
                 self.path.read_bytes(), None, None, None, 1
             )
             data = json.loads(clear)
             if not isinstance(data, dict):
+                raise ValueError
+            if "version" not in data:
+                return {"version": 2, "models": data, "audit": []}
+            if data["version"] != 2 or not isinstance(data.get("audit"), list):
                 raise ValueError
             return data
         except Exception:
@@ -98,19 +105,44 @@ class ModelStore:
     @staticmethod
     def public(model: dict) -> dict:
         """Return only non-secret fields, with a credential-presence indicator."""
-        return {
+        result = {
             k: model[k] for k in ("id", "name", "base_url", "model", "revision")
         } | {"has_key": bool(model["key"])}
+        if model["key"]:
+            for key in ("name", "base_url", "model"):
+                result[key] = result[key].replace(model["key"], "[已隐藏凭据]")
+        return result
 
     def list(self) -> list[dict]:
         """List saved models without decryptable credentials in the response."""
         with self.lock:
-            return [self.public(v) for v in self._read().values()]
+            return [self.public(v) for v in self._read()["models"].values()]
+
+    def audit(self) -> list[dict]:
+        """Read committed model changes, including removed models, without keys."""
+        with self.lock:
+            return list(reversed(self._read()["audit"]))
+
+    @staticmethod
+    def _audit(document: dict, model: dict, action: str) -> None:
+        public = ModelStore.public(model)
+        document["audit"].append(
+            dict(
+                sequence=len(document["audit"]) + 1,
+                at_utc=datetime.now(UTC).isoformat(),
+                actor="local-operator",
+                action=action,
+                target=model["id"],
+                name=public["name"],
+                model=public["model"],
+                revision=model["revision"],
+            )
+        )
 
     def selected(self, model_id: str) -> dict:
         """Resolve credentials internally for exactly one selected model."""
         with self.lock:
-            record = self._read().get(model_id)
+            record = self._read()["models"].get(model_id)
             if record is None:
                 raise PolicyError(404, "model_not_found")
             return record
@@ -123,7 +155,8 @@ class ModelStore:
         """Apply versioned edits; changing destinations requires re-entering a key."""
         value = profile(data)
         with self.lock:
-            models = self._read()
+            document = self._read()
+            models = document["models"]
             old = models.get(model_id)
             if data["expected_revision"] != (old["revision"] if old else 0):
                 raise PolicyError(409, "revision_conflict")
@@ -143,16 +176,19 @@ class ModelStore:
                 raise PolicyError(400, "model_key_required")
             value.update(id=model_id, revision=data["expected_revision"] + 1)
             models[model_id] = value
-            self._write(models)
+            self._audit(document, value, "update" if old else "create")
+            self._write(document)
             return self.public(value)
 
     def delete(self, model_id: str, revision: int) -> None:
         """Remove a model only if the page has the current revision."""
         with self.lock:
-            models = self._read()
+            document = self._read()
+            models = document["models"]
             if model_id not in models:
                 raise PolicyError(404, "model_not_found")
             if type(revision) is not int or models[model_id]["revision"] != revision:
                 raise PolicyError(409, "revision_conflict")
+            self._audit(document, models[model_id], "delete")
             del models[model_id]
-            self._write(models)
+            self._write(document)

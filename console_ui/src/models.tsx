@@ -1,3 +1,4 @@
+import { localApi, Value } from "./monitor";
 import { useEffect, useState, type FormEvent } from "react";
 import {
   Plus,
@@ -75,10 +76,12 @@ export function ModelWorkspace({
   view,
   refresh,
   goChat,
+  goRecords,
 }: {
   view: "models" | "chat";
   refresh: number;
   goChat: () => void;
+  goRecords: () => void;
 }) {
   const [models, setModels] = useState<Model[]>([]);
   const [loading, setLoading] = useState(true);
@@ -94,6 +97,43 @@ export function ModelWorkspace({
   const [maxTokens, setMaxTokens] = useState(512);
   const [sending, setSending] = useState(false);
   const [chatError, setChatError] = useState("");
+  const [saveContent, setSaveContent] = useState(false);
+  const [recordNotice, setRecordNotice] = useState("");
+  const [lastCall, setLastCall] = useState<{
+    model: string;
+    id: string;
+  } | null>(null);
+  const [usage, setUsage] = useState<{
+    prompt_tokens: number | null;
+    completion_tokens: number | null;
+    total_tokens: number | null;
+    usage_source: string;
+  } | null>(null);
+  useEffect(() => {
+    let active = true;
+    let timer: ReturnType<typeof setTimeout>;
+    setUsage(null);
+    async function read(attempt: number) {
+      if (!lastCall) return;
+      try {
+        const value = await localApi(
+          `records/${lastCall.model}/${lastCall.id}`,
+        );
+        if (!active) return;
+        setUsage(value.record);
+        if (value.record.total_tokens == null && attempt < 2)
+          timer = setTimeout(() => void read(attempt + 1), 700);
+      } catch {
+        if (active && attempt < 2)
+          timer = setTimeout(() => void read(attempt + 1), 700);
+      }
+    }
+    void read(0);
+    return () => {
+      active = false;
+      clearTimeout(timer);
+    };
+  }, [lastCall]);
   const [elapsed, setElapsed] = useState<number | null>(null);
 
   async function load() {
@@ -122,6 +162,9 @@ export function ModelWorkspace({
     setMessages([]);
     setChatError("");
     setElapsed(null);
+    setLastCall(null);
+    setSaveContent(false);
+    setRecordNotice("");
   }, [selected, model?.revision]);
   function edit(value: Model | "new") {
     setEditor(value);
@@ -192,14 +235,26 @@ export function ModelWorkspace({
         revision: model.revision,
         messages: next,
         max_tokens: maxTokens,
+        save_content: saveContent,
       });
       setMessages([...next, { role: "assistant", content: data.reply }]);
       setPrompt("");
       setElapsed(data.duration_ms);
+      setLastCall({ model: model.id, id: data.call_id });
+      setRecordNotice(
+        data.recording_failed
+          ? "调用已完成，但记录保存失败。"
+          : data.content_status === "save_failed"
+            ? "调用已完成，但正文保存失败。"
+            : data.content_status === "saved"
+              ? "本次请求与回复已在本机加密保存。"
+              : "本次正文未保存。",
+      );
     } catch (e) {
       setChatError(failed(e));
     } finally {
       setSending(false);
+      setSaveContent(false);
     }
   }
   return (
@@ -414,6 +469,8 @@ export function ModelWorkspace({
                 setMessages([]);
                 setChatError("");
                 setElapsed(null);
+                setLastCall(null);
+                setRecordNotice("");
               }}
               disabled={sending}
             >
@@ -460,6 +517,18 @@ export function ModelWorkspace({
               本次耗时 {elapsed} ms（包含首次启动耗时）
             </small>
           )}
+          {lastCall && (
+            <div className="monitor-chat-usage">
+              <span>
+                输入 <Value value={usage?.prompt_tokens} /> · 输出{" "}
+                <Value value={usage?.completion_tokens} /> · 总 token{" "}
+                <Value value={usage?.total_tokens} /> · 来源{" "}
+                {usage?.usage_source ?? "等待入库"}
+              </span>
+              <Button onClick={goRecords}>查看调用记录</Button>
+            </div>
+          )}
+          {recordNotice && <p className="pg-chat-timing">{recordNotice}</p>}
           <form onSubmit={send} className="pg-chat-compose">
             <label className="pg-field">
               消息
@@ -473,11 +542,20 @@ export function ModelWorkspace({
                 disabled={sending}
               />
             </label>
+            <label className="monitor-consent">
+              <input
+                type="checkbox"
+                checked={saveContent}
+                onChange={(e) => setSaveContent(e.target.checked)}
+                disabled={sending}
+              />
+              保存本次对话内容（包含上下文与回复，本机加密）
+            </label>
             <div className="pg-row">
               <small>
                 {messages.length >= 32
                   ? "本次对话已达 16 轮，请新建对话。"
-                  : "发送将调用所选服务，可能产生费用。正文不保存，刷新清空对话。"}
+                  : "发送将调用所选服务。未勾选则不保存正文；刷新清空当前对话窗口。"}
               </small>
               <Button
                 type="submit"

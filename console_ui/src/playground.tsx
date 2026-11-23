@@ -23,6 +23,7 @@ import { Card } from "@/components/ui/card";
 import "./style.css";
 import "./playground.css";
 import { ModelWorkspace } from "./models";
+import { Monitoring } from "./monitor";
 
 type Policy = {
   id: string;
@@ -61,7 +62,15 @@ type Result = {
   app?: string;
   model?: string;
 };
-type View = "call" | "policies" | "events" | "audit" | "models" | "chat";
+type View =
+  | "call"
+  | "policies"
+  | "events"
+  | "audit"
+  | "models"
+  | "chat"
+  | "records"
+  | "operations";
 const names: Record<string, string> = {
   "demo-app-a": "阿汐 · 模拟应用",
   "demo-app-b": "知识库 · 模拟应用",
@@ -228,7 +237,7 @@ function PolicyEditor({
 }
 
 function Playground() {
-  const [view, setView] = useState<View>("call");
+  const [view, setView] = useState<View>("models");
   const [state, setState] = useState<State | null>(null);
   const [events, setEvents] = useState<Event[]>([]);
   const [loading, setLoading] = useState(true);
@@ -241,7 +250,9 @@ function Playground() {
   const [result, setResult] = useState<Result | null>(null);
   const [notice, setNotice] = useState("");
   const [modelRefresh, setModelRefresh] = useState(0);
-  const localView = view === "models" || view === "chat";
+  const modelView = view === "models" || view === "chat";
+  const monitorView = view === "records" || view === "operations";
+  const localView = modelView || monitorView;
   async function refresh() {
     setLoading(true);
     setError("");
@@ -297,24 +308,30 @@ function Playground() {
   const nav = [
     ["models", "我的模型", Server],
     ["chat", "模型对话", MessageSquare],
+    ["records", "调用记录", Activity],
+    ["operations", "治理审计", History],
     ["call", "调用试验", FlaskConical],
     ["policies", "应用权限", SlidersHorizontal],
-    ["events", "调用记录", Activity],
-    ["audit", "治理审计", History],
+    ["events", "演示调用记录", Activity],
+    ["audit", "演示治理审计", History],
   ] as const;
   const titles = {
     models: "我的模型",
     chat: "模型对话",
     call: "模型 Playground",
     policies: "应用权限",
-    events: "调用记录",
-    audit: "治理审计",
+    records: "调用记录",
+    operations: "治理审计",
+    events: "演示调用记录",
+    audit: "演示治理审计",
   };
   const subtitles = {
     models: "添加自己的 OpenAI 兼容模型，配置加密保存在本机。",
     chat: "选择已添加的模型，进行连续对话测试。",
     call: "选一个应用，亲手验证模型访问规则。",
     policies: "为每个应用设置模型范围、调用上限和启用状态。",
+    records: "查看自有模型的真实调用、用量与对话详情。",
+    operations: "查看本机模型配置的实际操作历史。",
     events: "读取当前演示环境的 P2 事件库，仅保留调用元数据。",
     audit: "查看应用权限、限额和启用状态的变更记录。",
   };
@@ -365,7 +382,7 @@ function Playground() {
           </span>
           <span className="pg-tag">
             <FlaskConical size={13} />
-            {localView ? "OPENAI COMPATIBLE" : "DEMO"}
+            {localView ? "本机模型" : "DEMO"}
           </span>
         </header>
         <main className="pg-main">
@@ -393,11 +410,15 @@ function Playground() {
                 : "当前为演示环境 · 无需真实 Key · 固定假回复 · 本机操作员可管理合成应用"}
             </span>
           </div>
-          {localView && (
+          {monitorView && (
+            <Monitoring key={view} view={view} refresh={modelRefresh} />
+          )}
+          {modelView && (
             <ModelWorkspace
               view={view}
               refresh={modelRefresh}
               goChat={() => setView("chat")}
+              goRecords={() => setView("records")}
             />
           )}
           {!localView && error && (
