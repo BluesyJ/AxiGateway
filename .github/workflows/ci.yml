@@ -63,6 +63,8 @@ jobs:
         run: .\.venv\Scripts\python.exe -B scripts\test_core.py
       - name: LiteLLM contracts with fake upstream
         run: .\.venv\Scripts\python.exe -B scripts\test_core.py --contracts
+      - name: Offline model access demonstration
+        run: .\.venv-litellm\Scripts\python.exe -I -S scripts\demo_access.py
       - name: Frontend build and browser tests
         working-directory: console_ui
         run: |
@@ -79,6 +81,7 @@ jobs:
           path: |
             .cache/core-tests.xml
             .cache/contracts.json
+            .cache/access-demo/**/result.json
           retention-days: 7
           include-hidden-files: true
           if-no-files-found: ignore
