@@ -1,5 +1,13 @@
 # 当前工程说明
 
+2026-11-23监控补齐：主导航「调用记录」「治理审计」读取自有模型数据，旧功能改名「演示调用记录」「演示治理审计」。`monitor.py`存本机调用上下文及可选DPAPI正文，`monitor_queries.py`只读关联各模型P2事件，旧历史无需迁移；`models.py`兼容旧DPAPI格式，首次配置变更时将审计一起原子写入。未启用正文的旧请求、未记录的操作人不回填。启动命令仍见SETUP §7，真实测试只由用户执行。
+
+2026-11-23追加：用户选择OpenAI兼容接口，自有模型与连续对话继续放入PR #3。新增`playground/models.py`管理DPAPI配置，`model_runtime.py`按选择运行原LiteLLM master模式，`model_api.py`提供同源接口；前端`src/models.tsx`显示「我的模型」「模型对话」。数据默认`data/playground/`，不与每次重建的demo库混合。运行和隐私边界见[SETUP §7](SETUP.md#7-添加自有模型并对话)。`--offline-models`为验证入口约束，不放宽旧demo身份认证限制。页面保存后才可手动发送，保存不进行上游探测；测试脚本只使用合成配置。
+
+2026-11-23：PR #2 经用户批准已合入 main `df21f075`。本轮新增 P6/P7 内置 Playground，代码待 PR 审核；入口 `scripts/start_playground.py`，默认 `127.0.0.1:8790`，使用原锁环境运行。`axi_gateway/playground/runtime.py` 管理合成身份、假上游与 LiteLLM 子进程，`server.py` 将同源页面请求接入既有管理 API 和模型网关。前端入口 `console_ui/playground.html`，构建与原只读控制台共用锁文件。启动及操作见 [SETUP §6](SETUP.md#6-内置-playground-手动试用)，验证见 [结果](PLAYGROUND_RESULT.json)。
+
+每次运行建立独立 `.cache/playground/<run>/demo/`，刷新保留当前策略、审计和事件，重启新建 demo。私钥、token 和离线 access-demo 的 master key 只在内存；普通 master 模式继续用原 DPAPI 流程。本机操作员可管理合成应用，没有正式企业登录。页面仅显示固定假回复与元数据，无真实流量、正文留存或 Agent 执行。另一台开发前同步 main，检查开放 PR 和本机未提交改动。
+
 2026-11-20 新增离线模型访问管理后端，交付与限制见 [开发计划](proposals/20261120-model-access.md) 和 [SETUP §5](SETUP.md#5-模型访问管理后端演示)。`axi_gateway/access/identity.py` 复用 PyJWT 验证外部短期签名身份，`hook.py` 接入原 LiteLLM OSS 扩展，`policy.py` 在独立 demo 数据库执行授权、RPM 与治理审计，`server.py` 提供独立管理 API。`scripts/start_access.py` 默认绑定 8789；演示脚本使用空闲端口。
 
 4000 允许表和 8788 只读服务未扩展管理路由；签名身份模式必须显式离线启用。事件表没有迁移，`key_alias` 仅在此模式取框架可信应用标识。治理数据库不保存凭据，管理成功返回前提交策略和审计；调用事件仍尽力采集。公钥与管理员信任配置重启生效；登录页面、正式 IdP、Key 发放、Token/费用额度后续开发。旧源码快照和原机私有运行资料没有迁入当前克隆。

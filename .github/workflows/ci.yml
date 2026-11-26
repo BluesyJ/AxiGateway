@@ -73,6 +73,10 @@ jobs:
           npm.cmd run build
           if ($LASTEXITCODE) { exit $LASTEXITCODE }
           npm.cmd test
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          .\node_modules\.bin\playwright.cmd test --config playground.config.ts
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          .\node_modules\.bin\playwright.cmd test --config models.config.ts
       - name: Save synthetic test summaries
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4

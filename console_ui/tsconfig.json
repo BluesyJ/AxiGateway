@@ -18,6 +18,10 @@
     "playwright.config.ts",
     "playwright.p31.config.ts",
     "e2e",
-    "acceptance"
+    "acceptance",
+    "playground.config.ts",
+    "playground-tests",
+    "models.config.ts",
+    "model-tests"
   ]
 }
