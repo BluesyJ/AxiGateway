@@ -14,6 +14,13 @@ from axi_gateway.access.policy import PolicyError
 from axi_gateway.secrets import private_event_directory
 
 
+def check_model_destination(model: dict, previous_key: str = "") -> None:
+    """Keep current and replaced credentials out of proxy routing fields."""
+    for key in (model["key"], previous_key):
+        if key and (key in model["model"] or key in model["base_url"]):
+            raise PolicyError(400, "key_in_model_destination")
+
+
 def profile(data: dict) -> dict:
     """Accept explicit OpenAI-compatible endpoints, not provider request overrides."""
     if set(data) != {"name", "base_url", "model", "key", "expected_revision"}:
@@ -168,6 +175,7 @@ class ModelStore:
                 if old["base_url"] != value["base_url"] and old["key"]:
                     raise PolicyError(400, "new_endpoint_requires_key")
                 value["key"] = old["key"]
+            check_model_destination(value, old["key"] if old else "")
             if not value["key"] and urlsplit(value["base_url"]).hostname not in {
                 "localhost",
                 "127.0.0.1",

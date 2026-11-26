@@ -14,7 +14,7 @@ import httpx
 import yaml
 
 from axi_gateway.access.policy import PolicyError
-from axi_gateway.playground.models import ModelStore
+from axi_gateway.playground.models import ModelStore, check_model_destination
 from axi_gateway.playground.monitor import Monitor
 from axi_gateway.secrets import master_key, private_event_directory
 
@@ -47,6 +47,7 @@ class ModelRuntime:
         self.master = ""
 
     async def _start(self, model: dict) -> None:
+        check_model_destination(model)
         identity = (model["id"], model["revision"])
         if (
             self.active == identity

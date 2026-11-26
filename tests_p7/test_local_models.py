@@ -113,6 +113,77 @@ def test_corrupt_store_fails_closed(store: ModelStore) -> None:
     assert path.read_bytes() == b"invalid-synthetic-encrypted-data"
 
 
+@pytest.mark.parametrize(
+    "fields",
+    [{"model": KEY}, {"base_url": f"https://models.example/{KEY}/v1"}],
+    ids=["model-id", "endpoint-path"],
+)
+def test_create_rejects_key_in_destination(store: ModelStore, fields: dict) -> None:
+    with pytest.raises(PolicyError) as exc:
+        store.create(PROFILE | fields)
+    assert (exc.value.status, exc.value.code) == (400, "key_in_model_destination")
+    assert not store.path.exists()
+
+
+@pytest.mark.parametrize(
+    "key", ["", "replacement-synthetic-key"], ids=["keep", "rotate"]
+)
+def test_edit_rejects_old_key_in_destination(store: ModelStore, key: str) -> None:
+    saved = store.create(PROFILE)
+    before = store.path.read_bytes()
+    with pytest.raises(PolicyError) as exc:
+        store.put(
+            saved["id"],
+            PROFILE | dict(model=f"org/{KEY}", key=key, expected_revision=1),
+        )
+    assert exc.value.code == "key_in_model_destination"
+    assert store.path.read_bytes() == before
+
+
+@pytest.mark.parametrize(
+    "fields",
+    [{"model": KEY}, {"base_url": f"http://127.0.0.1/{KEY}/v1"}],
+    ids=["model-id", "endpoint-path"],
+)
+def test_legacy_destination_rejected_before_yaml_write(
+    store: ModelStore, fields: dict, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from axi_gateway.playground.model_runtime import ModelRuntime
+
+    alias = "local-0123456789abcdef"
+    legacy = (
+        dict(
+            id=alias,
+            revision=1,
+            name="Legacy",
+            model="org/model",
+            key=KEY,
+            base_url="http://127.0.0.1/v1",
+        )
+        | fields
+    )
+    store._write({alias: legacy})  # Original DPAPI document format.
+    runtime = ModelRuntime(ROOT, store, offline=True)
+
+    async def no_proxy(*args: object, **kwargs: object) -> None:
+        raise AssertionError("invalid profile reached proxy startup")
+
+    monkeypatch.setattr(asyncio, "create_subprocess_exec", no_proxy)
+    with pytest.raises(PolicyError) as exc:
+        asyncio.run(
+            runtime.chat(
+                dict(
+                    model=alias,
+                    revision=1,
+                    messages=[dict(role="user", content="hello")],
+                    max_tokens=1,
+                )
+            )
+        )
+    assert exc.value.code == "key_in_model_destination"
+    assert not list(store.directory.rglob("*.yaml"))
+
+
 def test_messages_and_output_limit_validation() -> None:
     from axi_gateway.playground.model_api import chat_input
 

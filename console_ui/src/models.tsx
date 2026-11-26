@@ -28,6 +28,7 @@ const errors: Record<string, string> = {
   model_store_unavailable:
     "模型配置无法读取或保存，请检查当前 Windows 账户和本机目录。",
   invalid_model_config: "请填写显示名称、接口地址和模型 ID。",
+  key_in_model_destination: "请从模型 ID 或接口地址中移除 API Key，只在 API Key 栏填写。",
   invalid_model_endpoint:
     "请填写 API 基础地址，例如 https://api.example.com/v1，不含 /chat/completions、查询参数或凭据。本地服务可用回环 HTTP 地址。",
   model_key_required: "远程模型需要 API Key。本地免认证服务可留空。",

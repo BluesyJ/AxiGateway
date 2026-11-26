@@ -289,10 +289,12 @@ def test_historical_request_does_not_inherit_new_upstream_model(tmp_path: Path) 
     assert record["revision"] is None and record["actor"] is None
 
 
-def test_audit_redacts_key_in_model_field_after_deletion(tmp_path: Path) -> None:
+def test_audit_redacts_legacy_key_in_model_field_after_deletion(tmp_path: Path) -> None:
     store = ModelStore(tmp_path)
-    saved = store.create(PROFILE | {"model": PROFILE["key"]})
-    store.delete(saved["id"], 1)
+    alias = "local-0123456789abcdef"
+    store._write({alias: PROFILE | dict(id=alias, revision=1, model=PROFILE["key"])})
+    store.delete(alias, 1)
+    assert store.audit()[0]["action"] == "delete"
     assert PROFILE["key"] not in json.dumps(store.audit())
 
 
